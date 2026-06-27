@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>iOS In-App Purchase Configurator — Build StoreKit Config Files</title>
+<meta name="description" content="Configure all iOS in-app purchase products — consumables, non-consumables, auto-renewable subscriptions — and export a ready-to-use StoreKit 2 configuration file. Free, browser-only." />
+<link rel="canonical" href="https://ios-iap-configurator.vercel.app/" />
+<meta property="og:title" content="iOS In-App Purchase Configurator" />
+<meta property="og:description" content="Build IAP product definitions and export a StoreKit 2 configuration file. Supports all four Apple product types. Free, browser-only." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="iOS In-App Purchase Configurator" />
+<meta name="twitter:description" content="Configure iOS IAPs and export StoreKit config files. Free." />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"iOS In-App Purchase Configurator","url":"https://ios-iap-configurator.vercel.app/","description":"Configure iOS in-app purchases and export StoreKit 2 configuration files. Supports consumables, non-consumables, auto-renewable subscriptions, and non-renewing subscriptions.","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
+<style>
+  :root{
+    --bg:#0b0c10;--panel:#15171f;--panel2:#1c1f2a;--ink:#eef1f7;--muted:#9aa3b5;
+    --line:#262a36;--accent:#5b8cff;--ok:#34d399;--warn:#fbbf24;--err:#f87171;
+    --radius:14px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:radial-gradient(1100px 600px at 60% -10%,#0d1f38 0,transparent 55%),var(--bg)}
+  header{padding:42px 22px 10px;max-width:960px;margin:0 auto}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);
+    border:1px solid var(--line);padding:5px 11px;border-radius:999px;background:var(--panel)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  h1{font-size:30px;margin:16px 0 6px;letter-spacing:-.4px}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);max-width:640px}
+  main{max-width:960px;margin:18px auto 60px;padding:0 22px}
+
+  /* Stats bar */
+  .stats-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+  .stat-chip{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:7px 16px;font-size:13.5px;display:flex;gap:8px;align-items:center}
+  .stat-num{font-weight:800;font-family:var(--mono);font-size:17px;color:var(--accent)}
+
+  /* Bundle ID row */
+  .bundle-row{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .bundle-row label{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap}
+  .bundle-row input{flex:1;min-width:220px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:14px;font-family:var(--mono);outline:none}
+  .bundle-row input:focus{border-color:var(--accent)}
+  .bundle-hint{font-size:12.5px;color:var(--muted)}
+
+  /* Section headers */
+  .section-head{display:flex;align-items:center;gap:10px;margin:28px 0 12px;flex-wrap:wrap}
+  .section-title{font-size:17px;font-weight:800;letter-spacing:-.2px;flex:1}
+  .add-btn{cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:7px 14px;
+    font:13px/1 inherit;font-weight:600;background:var(--panel);color:var(--ink)}
+  .add-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .add-btn.sub-type{border-color:#c084fc40;color:#c084fc}
+  .add-btn.sub-type:hover{border-color:#c084fc;background:rgba(192,132,252,.06)}
+
+  /* Product cards */
+  .product-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
+  .product-header{display:flex;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .type-badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid;letter-spacing:.2px}
+  .remove-btn{margin-left:auto;cursor:pointer;border:1px solid var(--line);border-radius:7px;
+    padding:4px 12px;font:12px/1 inherit;font-weight:600;background:none;color:var(--muted)}
+  .remove-btn:hover{border-color:var(--err);color:var(--err)}
+  .product-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 18px}
+  @media(max-width:640px){.product-fields,.sub-fields{grid-template-columns:1fr!important}}
+  .span2{grid-column:span 2}
+  .field-col{display:flex;flex-direction:column;gap:5px}
+  .field-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .field-hint{font-weight:400;text-transform:none;letter-spacing:0;opacity:.7}
+  .product-fields input,.product-fields select,.sub-fields input,.sub-fields select{
+    background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;
+    padding:8px 12px;font:inherit;font-size:14px;outline:none}
+  .product-fields input:focus,.product-fields select:focus,.sub-fields input:focus,.sub-fields select:focus{border-color:var(--accent)}
+  .share-row{flex-direction:row;align-items:center;gap:0;padding-top:18px}
+  .toggle-label{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13.5px;color:var(--muted)}
+  .toggle-label input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+
+  /* Subscription groups */
+  .group-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+  .group-header{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.03)}
+  .group-label{font-size:11px;font-weight:700;color:#c084fc;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+  .group-name-input{background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--ink);
+    font:inherit;font-size:16px;font-weight:700;padding:2px 4px;outline:none;width:100%;max-width:320px}
+  .group-name-input:focus{border-bottom-color:#c084fc}
+  .subs-body{padding:12px 18px}
+  .sub-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
+  .sub-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .sub-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+  .group-footer{padding:10px 18px 14px;border-top:1px solid var(--line)}
+  .add-sub-btn{cursor:pointer;border:1px dashed #c084fc60;border-radius:8px;padding:8px 16px;
+    font:13px/1 inherit;font-weight:600;background:none;color:#c084fc;width:100%}
+  .add-sub-btn:hover{border-style:solid;background:rgba(192,132,252,.05)}
+  .intro-section{background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);
+    border-radius:9px;margin:10px 14px 14px;padding:12px}
+  .intro-title{font-size:12px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+
+  /* Toolbar */
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 8px;align-items:center}
+  .toolbar button{cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:9px 18px;
+    font:13px/1 inherit;font-weight:600;background:var(--panel);color:var(--ink)}
+  .toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+  .toolbar button.primary{background:linear-gradient(180deg,#6b97ff,#4a78ff);border:0;color:#fff}
+  .toolbar button.primary:hover{opacity:.92}
+  .toolbar button.danger:hover{border-color:var(--err);color:var(--err)}
+  .toolbar-spacer{flex:1}
+
+  .empty-msg{color:var(--muted);font-size:14px;padding:20px;text-align:center}
+  .empty-msg.small{padding:10px;font-size:13px}
+
+  /* Type picker */
+  .type-picker{display:flex;gap:7px;flex-wrap:wrap}
+  .type-pick-btn{cursor:pointer;border-radius:8px;padding:7px 14px;font:13px/1 inherit;font-weight:600;border:1px solid}
+
+  .tip-box{background:linear-gradient(135deg,#1a2035 0%,#141825 100%);border:1px solid #2a304a;
+    border-radius:14px;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:28px}
+  footer{max-width:960px;margin:0 auto;padding:0 22px 50px;color:#6b7385;font-size:12.5px}
+  footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <span class="badge"><span class="dot"></span>All 4 Apple product types · StoreKit 2 config export · browser-only</span>
+  <h1>iOS <span>In-App Purchase Configurator</span></h1>
+  <p class="sub">Define your consumables, non-consumables, and subscriptions, then export a ready-to-use StoreKit 2 configuration file or a plain product ID list.</p>
+</header>
+<main>
+
+  <div class="stats-bar">
+    <div class="stat-chip"><span class="stat-num" id="statProducts">0</span> products</div>
+    <div class="stat-chip"><span class="stat-num" id="statGroups">0</span> subscription groups</div>
+    <div class="stat-chip"><span class="stat-num" id="statSubs">0</span> subscriptions</div>
+    <div class="stat-chip"><span class="stat-num" id="statTotal">0</span> total IDs</div>
+  </div>
+
+  <div class="toolbar">
+    <button class="primary" onclick="exportStoreKit()">↓ StoreKit Config (.storekit)</button>
+    <button onclick="exportProductIDs()">↓ Product IDs (.txt)</button>
+    <button onclick="exportCSV()">↓ CSV</button>
+    <span class="toolbar-spacer"></span>
+    <button class="danger" onclick="clearAll()">Clear All</button>
+  </div>
+
+  <div class="bundle-row">
+    <label>Bundle ID</label>
+    <input id="bundleId" type="text" placeholder="com.yourcompany.yourapp" spellcheck="false" />
+    <span class="bundle-hint">Used as prefix for auto-generated product IDs in the exported file</span>
+  </div>
+
+  <!-- In-App Products -->
+  <div class="section-head">
+    <div class="section-title">In-App Products</div>
+    <div class="type-picker">
+      <button class="type-pick-btn" style="color:var(--ok);border-color:#34d39940" onclick="addProduct('Consumable')">+ Consumable</button>
+      <button class="type-pick-btn" style="color:var(--accent);border-color:#5b8cff40" onclick="addProduct('NonConsumable')">+ Non-Consumable</button>
+      <button class="type-pick-btn" style="color:var(--warn);border-color:#fbbf2440" onclick="addProduct('NonRenewingSubscription')">+ Non-Renewing Sub</button>
+    </div>
+  </div>
+  <div id="productList"></div>
+
+  <!-- Subscription Groups -->
+  <div class="section-head">
+    <div class="section-title">Subscription Groups</div>
+    <button class="add-btn sub-type" onclick="addGroup()">+ Add Subscription Group</button>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin:-6px 0 14px">Auto-renewable subscriptions must belong to a group. Each group can contain multiple tiers (e.g. Monthly + Annual).</p>
+  <div id="groupList"></div>
+
+  <div class="tip-box">
+    <div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px">✦ Found this useful? Support the project</div>
+      <div style="color:#9aa3b5;font-size:13.5px;max-width:460px">Orb Intelligence is a one-person indie studio building free tools for iOS developers.</div>
+    </div>
+    <a href="https://buy.stripe.com/4gM28t2xG3SngLvbiY6wE01" target="_blank" rel="noopener"
+      style="display:inline-block;background:linear-gradient(180deg,#6b97ff,#4a78ff);color:#fff;font-weight:650;font-size:14.5px;padding:12px 26px;border-radius:10px;text-decoration:none;white-space:nowrap;flex:none">
+      Support · $9.90
+    </a>
+  </div>
+
+</main>
+<footer>
+  Built by <b>Orb Intelligence</b>. All data is saved locally in your browser — nothing is uploaded or sent anywhere.
+  Export the <code>.storekit</code> file and open it in Xcode to test your IAPs locally before submitting to App Store Connect.
+  <br><br>
+  More free tools:
+  <a href="https://appstore-metadata-auditor.vercel.app/" rel="noopener">Metadata Auditor</a> ·
+  <a href="https://ios-privacy-policy-generator.vercel.app/" rel="noopener">Privacy Policy Generator</a> ·
+  <a href="https://ios-app-review-generator.vercel.app/" rel="noopener">Review Responder</a> ·
+  <a href="https://appstore-screenshot-generator-theta.vercel.app/" rel="noopener">Screenshot Generator</a> ·
+  <a href="https://appstore-keyword-optimizer.vercel.app/" rel="noopener">Keyword Optimizer</a> ·
+  <a href="https://appstore-release-notes-generator.vercel.app/" rel="noopener">Release Notes Generator</a> ·
+  <a href="https://ios-app-icon-resizer.vercel.app/" rel="noopener">Icon Resizer</a> ·
+  <a href="https://appstore-submission-checklist.vercel.app/" rel="noopener">Submission Checklist</a> ·
+  <a href="https://ios-privacy-manifest-generator.vercel.app/" rel="noopener">Privacy Manifest Generator</a> ·
+  <a href="https://ios-entitlements-generator.vercel.app/" rel="noopener">Entitlements Generator</a> ·
+  <a href="https://testflight-feedback-organizer.vercel.app/" rel="noopener">Beta Feedback Organizer</a> ·
+  <a href="https://appstore-localization-helper.vercel.app/" rel="noopener">Localization Helper</a> ·
+  <a href="https://appstore-age-rating-calculator.vercel.app/" rel="noopener">Age Rating Calculator</a> ·
+  <a href="https://ios-iap-configurator.vercel.app/" rel="noopener">IAP Configurator</a>
+</footer>
+<script src="configurator.js"></script>
+</body>
+</html>
